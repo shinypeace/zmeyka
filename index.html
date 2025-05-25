@@ -251,6 +251,14 @@ let gameInterval;
 let gameSpeed = 100;
 let lastUpdateTime = 0;
 let isGameRunning = false;
+let snakeCells = new Set();
+
+// При движении змейки
+snakeCells.clear();
+snake.forEach(segment => {
+    snakeCells.add(`${segment.x},${segment.y}`);
+});
+
 
 vkBridge.send('VKWebAppInit', {})
     .then(async () => {
@@ -489,20 +497,40 @@ function updateSnake() {
     };
     
     snake.unshift(head);
-    if (head.x === food.x && head.y === food.y) {
+    
+    // Проверка съедения яблока
+    if (head.x === food.x && head.y === food.y && food.x !== -1) {
         score++;
         scoreElement.textContent = score;
         placeFood();
     } else {
         snake.pop();
     }
+
+    // Обновление Set для быстрой проверки позиций
+    snakeCells.clear();
+    snake.forEach(segment => {
+        snakeCells.add(`${segment.x},${segment.y}`);
+    });
+
+    // Проверка полного заполнения поля
+    if (food.x === -1) {
+        endGame(true);
+    }
 }
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    drawApple(food.x * CELL_SIZE + CELL_SIZE/2, food.y * CELL_SIZE + CELL_SIZE/2);
+    // Отрисовка яблока
+    if (food.x !== -1) {
+        drawApple(
+            food.x * CELL_SIZE + CELL_SIZE/2,
+            food.y * CELL_SIZE + CELL_SIZE/2
+        );
+    }
     
+    // Отрисовка змейки
     ctx.fillStyle = '#4CAF50';
     ctx.strokeStyle = '#2e7d32';
     ctx.lineWidth = 2;
@@ -543,6 +571,7 @@ function draw() {
         }
     });
 
+    // Отрисовка глаз
     const head = snake[0];
     drawEyes(
         head.x * CELL_SIZE + CELL_SIZE/2,
@@ -652,8 +681,41 @@ function drawEyes(x, y, dir) {
 }
 
 function placeFood() {
-    food.x = Math.floor(Math.random() * (canvas.width / CELL_SIZE));
-    food.y = Math.floor(Math.random() * (canvas.height / CELL_SIZE));
+    const gridWidth = canvas.width / CELL_SIZE;
+    const gridHeight = canvas.height / CELL_SIZE;
+    const maxAttempts = 1000;
+    
+    // Быстрый поиск случайной позиции
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const newX = Math.floor(Math.random() * gridWidth);
+        const newY = Math.floor(Math.random() * gridHeight);
+        
+        if (!snakeCells.has(`${newX},${newY}`)) {
+            food.x = newX;
+            food.y = newY;
+            return;
+        }
+    }
+    
+    // Полный перебор при неудаче
+    const freeCells = [];
+    for (let x = 0; x < gridWidth; x++) {
+        for (let y = 0; y < gridHeight; y++) {
+            if (!snakeCells.has(`${x},${y}`)) {
+                freeCells.push({x, y});
+            }
+        }
+    }
+    
+    if (freeCells.length > 0) {
+        const randomCell = freeCells[Math.floor(Math.random() * freeCells.length)];
+        food.x = randomCell.x;
+        food.y = randomCell.y;
+    } else {
+        // Все клетки заняты
+        food.x = -1;
+        food.y = -1;
+    }
 }
 
 function checkCollision() {
