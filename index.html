@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Игра Змейка</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Arial', sans-serif;
+            background-color: #e0f7fa;
+            overscroll-behavior: none;
+            -webkit-overflow-scrolling: auto;
+        }
+
+        h1 {
+            font-size: 32px;
+            color: #00796b;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(90deg, #00796b, #d32f2f);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
+        }
+
+        .menu {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .difficultyBtn {
+            margin: 10px;
+            padding: 12px 24px;
+            font-size: 20px;
+            background-color: #00796b;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            font-weight: bold;
+        }
+
+        .difficultyBtn:hover {
+            background-color: #004d40;
+            transform: scale(1.05);
+        }
+
+        .difficultyBtn:active {
+            transform: scale(0.95);
+        }
+
+        .game-container {
+            position: relative;
+            border: 2px solid #00796b;
+            box-sizing: border-box;
+        }
+
+        canvas {
+            background-color: #f0f4f4;
+            border-radius: 10px;
+        }
+
+        .score {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 20px;
+            color: #00796b;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 10;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            width: 300px;
+        }
+
+        .modal-content h2 {
+            color: #00796b;
+            margin-bottom: 15px;
+        }
+
+        .modal-content button {
+            background-color: #d32f2f;
+            margin: 5px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .modal-content button:hover {
+            background-color: #b71c1c;
+        }
+
+        .game-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin: 20px;
+            aspect-ratio: 1/1;
+            overflow: hidden;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            background-color: #f0f4f4;
+            image-rendering: pixelated;
+        }
+
+        @media (max-width: 480px) {
+            .menu {
+                width: 90%;
+            }
+            
+            .difficultyBtn {
+                width: 100%;
+                margin: 8px 0;
+            }
+            
+            .modal-content {
+                width: 90%;
+            }
+        }
+
+        .stats-list {
+            margin: 20px 0;
+            font-size: 18px;
+        }
+
+        .stats-list div {
+            margin: 10px 0;
+            padding: 8px;
+            background: #f5f5f5;
+            border-radius: 5px;
+        }
+
+        .closeStatsBtn {
+            background-color: #00796b !important;
+        }
+
+        html {
+            overflow: hidden;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+    </style>
+    <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
+</head>
+<body>
+    <h1>Змейка</h1>
+    <div id="mainMenu" class="menu">
+        <button class="difficultyBtn" data-speed="200" data-difficulty="easy">Просто</button>
+        <button class="difficultyBtn" data-speed="150" data-difficulty="medium">Средне</button>
+        <button class="difficultyBtn" data-speed="100" data-difficulty="hard">Сложно</button>
+        <button id="statsBtn" class="difficultyBtn">Статистика</button>
+    </div>
+    
+    <div class="game-container" style="display: none;">
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+        <div class="score">Счет: <span id="score">0</span></div>
+    </div>
+    
+    <div id="gameOverModal" class="modal">
+        <div class="modal-content">
+            <h2>Игра окончена!</h2>
+            <p>Ваш счет: <span id="finalScore">0</span></p>
+            <p>Рекорд: <span id="highScore">0</span></p>
+            <button id="restartBtn">Начать сначала</button>
+            <button id="menuBtn">В меню</button>
+            <button id="shareBtn" class="button">Поделиться</button>
+        </div>
+    </div>
+
+    <div id="statsModal" class="modal">
+        <div class="modal-content">
+            <h2>Рекорды</h2>
+            <div class="stats-list">
+                <div>Просто: <span id="highScoreEasy">0</span></div>
+                <div>Средне: <span id="highScoreMedium">0</span></div>
+                <div>Сложно: <span id="highScoreHard">0</span></div>
+            </div>
+            <button class="closeStatsBtn">Закрыть</button>
+        </div>
+    </div>
+
+<script>
+const APP_ID = 53620616;
+let vkUser = null;
+let vkUserId = null;
+let vkAccessToken = null;
+let highScores = {
+    easy: 0,
+    medium: 0,
+    hard: 0
+};
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreElement = document.getElementById('score');
+const finalScoreElement = document.getElementById('finalScore');
+const highScoreElement = document.getElementById('highScore');
+const gameOverModal = document.getElementById('gameOverModal');
+const restartBtn = document.getElementById('restartBtn');
+const menuBtn = document.getElementById('menuBtn');
+const mainMenu = document.getElementById('mainMenu');
+const gameContainer = document.querySelector('.game-container');
+
+const CELL_SIZE = 20;
+const SNAKE_SIZE = CELL_SIZE - 2;
+
+let snake = [{ x: 10, y: 10 }];
+let direction = { x: 0, y: 0 };
+let nextDirection = { x: 0, y: 0 };
+let food = { x: 15, y: 15 };
+let score = 0;
+let gameInterval;
+let gameSpeed = 100;
+let lastUpdateTime = 0;
+let isGameRunning = false;
+
+vkBridge.send('VKWebAppInit', {})
+    .then(async () => {
+        console.log('VK Bridge initialized');
+        const params = new URLSearchParams(window.location.hash.substr(1));
+        vkUserId = params.get('vk_user_id');
+        vkAccessToken = params.get('vk_access_token');
+        
+        if (vkUserId && vkAccessToken) {
+            try {
+                await validateSignature(params);
+                vkUser = await vkBridge.send('VKWebAppGetUserInfo');
+                await loadStats();
+            } catch (err) {
+                console.error('VK auth error:', err);
+                loadLocalStats();
+            }
+        } else {
+            loadLocalStats();
+        }
+    })
+    .catch(err => {
+        console.error('VK init error:', err);
+        loadLocalStats();
+    });
+
+async function validateSignature(params) {
+    const sign = params.get('sign');
+    const checkParams = new URLSearchParams();
+    
+    params.forEach((value, key) => {
+        if (key !== 'sign') checkParams.set(key, value);
+    });
+
+    const isValid = await vkBridge.send('VKWebAppVerifyMessage', {
+        message: checkParams.toString(),
+        signature: sign
+    });
+
+    if (!isValid) throw new Error('Invalid signature');
+}
+
+// Показ баннера рекламы
+function showBannerAd() {
+    vkBridge.send("VKWebAppShowBannerAd")
+        .then(response => {
+            console.log('Баннерная реклама показана:', response);
+        })
+        .catch(error => {
+            console.error('Ошибка при показе баннерной рекламы:', error);
+        });
+}
+
+// Скрытие баннера рекламы
+function hideBannerAd() {
+    vkBridge.send("VKWebAppHideBannerAd")
+        .then(response => {
+            console.log('Баннерная реклама скрыта:', response);
+        })
+        .catch(error => {
+            console.error('Ошибка при скрытии баннерной рекламы:', error);
+        });
+}
+
+// Подписка на события
+vkBridge.subscribe((e) => {
+    if (e.detail.type === 'VKWebAppBannerAdUpdated') {
+        console.log('Баннерная реклама обновлена:', e);
+    } else if (e.detail.type === 'VKWebAppBannerAdClosedByUser') {
+        console.log('Пользователь закрыл рекламу:', e);
+    }
+});
+
+function checkAndShowAd() {
+    vkBridge.send('VKWebAppCheckNativeAds')
+    .then(data => {
+        if (data.available) {
+            // Если рекламные материалы доступны, показываем их
+            vkBridge.send('VKWebAppShowNativeAds')
+            .then(() => {
+                // Успешное отображение рекламы
+            })
+            .catch(error => {
+                console.error('Ошибка при показе рекламы:', error);
+            });
+        } else {
+            console.log('Рекламные материалы не доступны.');
+        }
+    })
+    .catch(error => {
+        console.error('Ошибка при проверке наличия рекламы:', error);
+    });
+}
+
+// Проверка готовности межэкранной рекламы
+function checkAdReadyInterstitial() {
+    return vkBridge.send('VKWebAppCheckNativeAds', { ad_format: 'interstitial' });
+}
+
+// Проверка готовности рекламы за вознаграждение
+function checkAdReadyReward() {
+    return vkBridge.send('VKWebAppCheckNativeAds', { ad_format: 'reward' });
+}
+
+// Показ межэкранной рекламы
+function showAdInterstitial() {
+    return vkBridge.send('VKWebAppShowNativeAds', { ad_format: 'interstitial' })
+        .then((data) => {
+            if (data.result) {
+                console.log('Межэкранная реклама показана');
+            } else {
+                console.log('Ошибка при показе межэкранной рекламы');
+            }
+        })
+        .catch((error) => {
+            console.error('Ошибка при показе межэкранной рекламы:', error);
+        });
+}
+
+// Показ рекламы за вознаграждение
+function showAdReward() {
+    return vkBridge.send('VKWebAppShowNativeAds', { ad_format: 'reward' })
+        .then((data) => {
+            if (data.result) {
+                console.log('Реклама за вознаграждение показана');
+            } else {
+                console.log('Ошибка при показе рекламы за вознаграждение');
+            }
+        })
+        .catch((error) => {
+            console.error('Ошибка при показе рекламы за вознаграждение:', error);
+        });
+}
+
+
+async function saveStats() {
+    const data = {
+        highScores,
+        lastUpdated: Date.now()
+    };
+
+    try {
+        if (vkUserId) {
+            await vkBridge.send('VKWebAppStorageSet', {
+                key: `snakeStats_${vkUserId}`,
+                value: JSON.stringify(data)
+            });
+        }
+        localStorage.setItem('snakeHighScores', JSON.stringify(highScores));
+    } catch (err) {
+        console.error('Save error:', err);
+        localStorage.setItem('snakeHighScores', JSON.stringify(highScores));
+    }
+}
+
+async function loadStats() {
+    try {
+        let data = null;
+        
+        if (vkUserId) {
+            const response = await vkBridge.send('VKWebAppStorageGet', {
+                keys: [`snakeStats_${vkUserId}`]
+            });
+            if (response.keys[0]?.value) {
+                data = JSON.parse(response.keys[0].value);
+            }
+        }
+        
+        if (!data) {
+            data = JSON.parse(localStorage.getItem('snakeHighScores'));
+        }
+
+        if (data) {
+            highScores = data.highScores || { easy: 0, medium: 0, hard: 0 };
+            updateStatsDisplay();
+        }
+    } catch (err) {
+        console.error('Load error:', err);
+        loadLocalStats();
+    }
+}
+
+function loadLocalStats() {
+    const localData = localStorage.getItem('snakeHighScores');
+    if (localData) {
+        highScores = JSON.parse(localData);
+        updateStatsDisplay();
+    }
+}
+
+function updateStatsDisplay() {
+    if(document.getElementById('highScoreEasy')) {
+        document.getElementById('highScoreEasy').textContent = highScores.easy;
+        document.getElementById('highScoreMedium').textContent = highScores.medium;
+        document.getElementById('highScoreHard').textContent = highScores.hard;
+    }
+}
+
+function startGame() {
+    snake = [{ x: 10, y: 10 }];
+    direction = { x: 0, y: 1 };
+    nextDirection = { x: 0, y: 1 };
+    score = 0;
+    scoreElement.textContent = score;
+    placeFood();
+    gameOverModal.style.display = 'none';
+    mainMenu.style.display = 'none';
+    gameContainer.style.display = 'block';
+    isGameRunning = true;
+    requestAnimationFrame(gameLoop);
+    showBannerAd();
+}
+
+function gameLoop(timestamp) {
+    if (!isGameRunning) return;
+    
+    const deltaTime = timestamp - lastUpdateTime;
+    if (deltaTime > gameSpeed) {
+        lastUpdateTime = timestamp;
+        updateSnake();
+        if (checkCollision()) {
+            endGame();
+            return;
+        }
+    }
+    
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+function updateSnake() {
+    direction = {...nextDirection};
+    const head = { 
+        x: snake[0].x + direction.x,
+        y: snake[0].y + direction.y
+    };
+    
+    snake.unshift(head);
+    if (head.x === food.x && head.y === food.y) {
+        score++;
+        scoreElement.textContent = score;
+        placeFood();
+    } else {
+        snake.pop();
+    }
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    drawApple(food.x * CELL_SIZE + CELL_SIZE/2, food.y * CELL_SIZE + CELL_SIZE/2);
+    
+    ctx.fillStyle = '#4CAF50';
+    ctx.strokeStyle = '#2e7d32';
+    ctx.lineWidth = 2;
+
+    snake.forEach((segment, index) => {
+        const x = segment.x * CELL_SIZE;
+        const y = segment.y * CELL_SIZE;
+        
+        if(index === 0) {
+            drawHead(x, y, direction);
+        } else {
+            const prev = snake[index-1];
+            const next = snake[index+1];
+            
+            ctx.beginPath();
+            ctx.moveTo(
+                prev.x * CELL_SIZE + CELL_SIZE/2,
+                prev.y * CELL_SIZE + CELL_SIZE/2
+            );
+            
+            ctx.lineTo(
+                segment.x * CELL_SIZE + CELL_SIZE/2,
+                segment.y * CELL_SIZE + CELL_SIZE/2
+            );
+            
+            if(next) {
+                ctx.lineTo(
+                    next.x * CELL_SIZE + CELL_SIZE/2,
+                    next.y * CELL_SIZE + CELL_SIZE/2
+                );
+            }
+            
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#2e7d32';
+            ctx.lineWidth = CELL_SIZE;
+            ctx.stroke();
+        }
+    });
+
+    const head = snake[0];
+    drawEyes(
+        head.x * CELL_SIZE + CELL_SIZE/2,
+        head.y * CELL_SIZE + CELL_SIZE/2,
+        direction
+    );
+}
+
+function drawApple(x, y) {
+    ctx.beginPath();
+    ctx.arc(x, y, CELL_SIZE/2, 0, Math.PI * 2);
+    
+    const gradient = ctx.createRadialGradient(
+        x - 5, y - 5, 1,
+        x, y, CELL_SIZE/2
+    );
+    gradient.addColorStop(0, '#ff3333');
+    gradient.addColorStop(1, '#cc0000');
+    
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    
+    ctx.beginPath();
+    ctx.arc(x + 5, y - 5, 3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.fill();
+    
+    ctx.beginPath();
+    ctx.moveTo(x + 5, y - 10);
+    ctx.quadraticCurveTo(x + 8, y - 18, x + 12, y - 8);
+    ctx.lineTo(x + 5, y - 10);
+    ctx.closePath();
+    
+    const leafGradient = ctx.createLinearGradient(
+        x + 5, y - 10,
+        x + 12, y - 8
+    );
+    leafGradient.addColorStop(0, '#85c285');
+    leafGradient.addColorStop(1, '#2d5a27');
+    
+    ctx.fillStyle = leafGradient;
+    ctx.fill();
+    
+    ctx.strokeStyle = '#1f411f';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+}
+
+function drawHead(x, y, dir) {
+    ctx.beginPath();
+    ctx.arc(
+        x + CELL_SIZE/2,
+        y + CELL_SIZE/2,
+        CELL_SIZE/2,
+        0,
+        Math.PI * 2
+    );
+    
+    const gradient = ctx.createRadialGradient(
+        x + CELL_SIZE/2 - dir.x * 5,
+        y + CELL_SIZE/2 - dir.y * 5,
+        2,
+        x + CELL_SIZE/2,
+        y + CELL_SIZE/2,
+        CELL_SIZE/2
+    );
+    gradient.addColorStop(0, '#66bb6a');
+    gradient.addColorStop(1, '#2e7d32');
+    
+    ctx.fillStyle = gradient;
+    ctx.fill();
+}
+
+function drawEyes(x, y, dir) {
+    const eyeOffset = {
+        x: dir.x !== 0 ? 6 : 4,
+        y: dir.y !== 0 ? 6 : 4
+    };
+    
+    ctx.beginPath();
+    ctx.arc(
+        x - dir.y * eyeOffset.x,
+        y + dir.x * eyeOffset.y,
+        3, 0, Math.PI * 2
+    );
+    ctx.arc(
+        x + dir.y * eyeOffset.x,
+        y - dir.x * eyeOffset.y,
+        3, 0, Math.PI * 2
+    );
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.fill();
+    
+    ctx.beginPath();
+    ctx.arc(
+        x - dir.y * (eyeOffset.x + 2),
+        y + dir.x * (eyeOffset.y + 2),
+        1.5, 0, Math.PI * 2
+    );
+    ctx.arc(
+        x + dir.y * (eyeOffset.x + 2),
+        y - dir.x * (eyeOffset.y + 2),
+        1.5, 0, Math.PI * 2
+    );
+    ctx.fillStyle = '#222';
+    ctx.fill();
+}
+
+function placeFood() {
+    food.x = Math.floor(Math.random() * (canvas.width / CELL_SIZE));
+    food.y = Math.floor(Math.random() * (canvas.height / CELL_SIZE));
+}
+
+function checkCollision() {
+    const head = snake[0];
+    
+    if (head.x < 0 || head.x >= canvas.width / CELL_SIZE || 
+        head.y < 0 || head.y >= canvas.height / CELL_SIZE) {
+        return true;
+    }
+
+    const bodyCollision = snake.slice(1).some(segment => 
+        segment.x === head.x && segment.y === head.y
+    );
+    
+    const oppositeDirection = snake.length > 1 && (
+        (direction.x === -nextDirection.x && direction.x !== 0) ||
+        (direction.y === -nextDirection.y && direction.y !== 0)
+    );
+    
+    return bodyCollision || oppositeDirection;
+}
+
+document.querySelectorAll('.difficultyBtn').forEach(button => {
+    button.addEventListener('click', (event) => {
+        if(event.target.id !== 'statsBtn') {
+            currentDifficulty = event.target.dataset.difficulty;
+            gameSpeed = parseInt(event.target.dataset.speed);
+            startGame();
+        }
+    });
+});
+
+document.getElementById('statsBtn').addEventListener('click', () => {
+    statsModal.style.display = 'flex';
+    updateStatsDisplay();
+});
+
+document.querySelector('.closeStatsBtn').addEventListener('click', () => {
+    statsModal.style.display = 'none';
+});
+
+async function endGame() {
+    isGameRunning = false;
+    
+    if (score > highScores[currentDifficulty]) {
+        highScores[currentDifficulty] = score;
+        await saveStats();
+        
+        try {
+            await vkBridge.send('VKWebAppSetLeaderboardScore', {
+                leaderboard_id: 1,
+                score: Math.max(...Object.values(highScores))
+            });
+        } catch (err) {
+            console.error('Leaderboard error:', err);
+        }
+    }
+    showAdInterstitial(); // Показываем рекламу
+    finalScoreElement.textContent = score;
+    highScoreElement.textContent = highScores[currentDifficulty];
+    gameOverModal.style.display = 'flex';
+    gameContainer.style.display = 'none';
+}
+
+document.addEventListener('keydown', (event) => {
+    if (!isGameRunning) return;
+    
+    const key = event.key;
+    if (key.startsWith('Arrow')) {
+        event.preventDefault();
+        
+        const newDirection = { x: 0, y: 0 };
+        switch (key) {
+            case 'ArrowUp': newDirection.y = -1; break;
+            case 'ArrowDown': newDirection.y = 1; break;
+            case 'ArrowLeft': newDirection.x = -1; break;
+            case 'ArrowRight': newDirection.x = 1; break;
+        }
+        
+        if (!(
+            (direction.x !== 0 && newDirection.x === -direction.x) ||
+            (direction.y !== 0 && newDirection.y === -direction.y)
+        )) {
+            nextDirection = newDirection;
+        }
+    }
+});
+
+function resizeCanvas() {
+    const container = document.querySelector('.game-container');
+    const maxSize = Math.min(
+        window.innerWidth - 40, 
+        window.innerHeight - 200, 
+        600
+    );
+    
+    container.style.width = `${maxSize}px`;
+    container.style.height = `${maxSize}px`;
+    
+    canvas.width = 400;
+    canvas.height = 400;
+    canvas.style.width = `${maxSize}px`;
+    canvas.style.height = `${maxSize}px`;
+}
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+restartBtn.addEventListener('click', startGame);
+menuBtn.addEventListener('click', showMenu);
+
+document.getElementById('shareBtn').addEventListener('click', async () => {
+    try {
+        await vkBridge.send('VKWebAppShare', {
+            link: 'https://vk.com/app53620616',
+            title: 'Змейка',
+            text: `Я набрал ${score} очков в Змейке! Попробуй побить мой рекорд!`
+        });
+    } catch (err) {
+        console.error('Share error:', err);
+    }
+});
+
+function showMenu() {
+    isGameRunning = false;
+    gameContainer.style.display = 'none';
+    gameOverModal.style.display = 'none';
+    mainMenu.style.display = 'flex';
+    showBannerAd();
+}
+
+// Блокировка контекстного меню
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// Блокировка выделения текста
+document.onselectstart = () => false;
+
+// Добавляем в начало переменные
+let touchStartX = 0;
+let touchStartY = 0;
+const minSwipeDistance = 30; // Минимальная дистанция для определения свайпа
+
+// Добавляем обработчики событий касаний
+document.addEventListener('touchstart', handleTouchStart, { passive: false });
+document.addEventListener('touchmove', handleTouchMove, { passive: false });
+document.addEventListener('touchend', handleTouchEnd);
+
+function handleTouchStart(event) {
+    if (!isGameRunning) return;
+    
+    const touch = event.touches[0];
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    event.preventDefault();
+}
+
+function handleTouchMove(event) {
+    if (!isGameRunning) return;
+    event.preventDefault();
+}
+
+function handleTouchEnd(event) {
+    if (!isGameRunning) return;
+    
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - touchStartX;
+    const deltaY = touch.clientY - touchStartY;
+    
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        // Горизонтальный свайп
+        if (Math.abs(deltaX) < minSwipeDistance) return;
+        
+        if (deltaX > 0 && direction.x !== -1) {
+            nextDirection = { x: 1, y: 0 }; // Вправо
+        } else if (deltaX < 0 && direction.x !== 1) {
+            nextDirection = { x: -1, y: 0 }; // Влево
+        }
+    } else {
+        // Вертикальный свайп
+        if (Math.abs(deltaY) < minSwipeDistance) return;
+        
+        if (deltaY > 0 && direction.y !== -1) {
+            nextDirection = { x: 0, y: 1 }; // Вниз
+        } else if (deltaY < 0 && direction.y !== 1) {
+            nextDirection = { x: 0, y: -1 }; // Вверх
+        }
+    }
+    event.preventDefault();
+}
+
+showMenu();
+loadLocalStats();
+</script>
+</body>
+</html>
