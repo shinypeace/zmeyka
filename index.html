@@ -473,7 +473,7 @@ function gameLoop(timestamp) {
         updateSnake();
         if (checkCollision()) {
             endGame();
-            return;
+            return; // Важно немедленно выйти из цикла
         }
     }
     
@@ -659,21 +659,19 @@ function placeFood() {
 function checkCollision() {
     const head = snake[0];
     
-    if (head.x < 0 || head.x >= canvas.width / CELL_SIZE || 
-        head.y < 0 || head.y >= canvas.height / CELL_SIZE) {
-        return true;
-    }
+    // 1. Проверка выхода за границы поля
+    const wallCollision = 
+        head.x < 0 || 
+        head.x >= canvas.width / CELL_SIZE || 
+        head.y < 0 || 
+        head.y >= canvas.height / CELL_SIZE;
 
+    // 2. Проверка столкновения с телом
     const bodyCollision = snake.slice(1).some(segment => 
         segment.x === head.x && segment.y === head.y
     );
-    
-    const oppositeDirection = snake.length > 1 && (
-        (direction.x === -nextDirection.x && direction.x !== 0) ||
-        (direction.y === -nextDirection.y && direction.y !== 0)
-    );
-    
-    return bodyCollision || oppositeDirection;
+
+    return wallCollision || bodyCollision;
 }
 
 document.querySelectorAll('.difficultyBtn').forEach(button => {
@@ -696,26 +694,25 @@ document.querySelector('.closeStatsBtn').addEventListener('click', () => {
 });
 
 async function endGame() {
-    isGameRunning = false;
+    if (!isGameRunning) return; // Защита от повторного вызова
     
-    if (score > highScores[currentDifficulty]) {
-        highScores[currentDifficulty] = score;
-        await saveStats();
-        
-        try {
-            await vkBridge.send('VKWebAppSetLeaderboardScore', {
-                leaderboard_id: 1,
-                score: Math.max(...Object.values(highScores))
-            });
-        } catch (err) {
-            console.error('Leaderboard error:', err);
-        }
-    }
-    showAdInterstitial(); // Показываем рекламу
+    isGameRunning = false;
+    cancelAnimationFrame(gameLoop);
+    
+    // Обновление интерфейса
     finalScoreElement.textContent = score;
     highScoreElement.textContent = highScores[currentDifficulty];
     gameOverModal.style.display = 'flex';
     gameContainer.style.display = 'none';
+    
+    // Показ рекламы
+    await showAdInterstitial().catch(console.error);
+    
+    // Сохранение статистики
+    if (score > highScores[currentDifficulty]) {
+        highScores[currentDifficulty] = score;
+        await saveStats();
+    }
 }
 
 document.addEventListener('keydown', (event) => {
@@ -733,10 +730,8 @@ document.addEventListener('keydown', (event) => {
             case 'ArrowRight': newDirection.x = 1; break;
         }
         
-        if (!(
-            (direction.x !== 0 && newDirection.x === -direction.x) ||
-            (direction.y !== 0 && newDirection.y === -direction.y)
-        )) {
+        // Запрет противоположного направления
+        if (direction.x !== -newDirection.x || direction.y !== -newDirection.y) {
             nextDirection = newDirection;
         }
     }
@@ -822,25 +817,21 @@ function handleTouchEnd(event) {
     const deltaX = touch.clientX - touchStartX;
     const deltaY = touch.clientY - touchStartY;
     
+    let newDirection = { x: 0, y: 0 };
+    
     if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        // Горизонтальный свайп
         if (Math.abs(deltaX) < minSwipeDistance) return;
-        
-        if (deltaX > 0 && direction.x !== -1) {
-            nextDirection = { x: 1, y: 0 }; // Вправо
-        } else if (deltaX < 0 && direction.x !== 1) {
-            nextDirection = { x: -1, y: 0 }; // Влево
-        }
+        newDirection.x = deltaX > 0 ? 1 : -1;
     } else {
-        // Вертикальный свайп
         if (Math.abs(deltaY) < minSwipeDistance) return;
-        
-        if (deltaY > 0 && direction.y !== -1) {
-            nextDirection = { x: 0, y: 1 }; // Вниз
-        } else if (deltaY < 0 && direction.y !== 1) {
-            nextDirection = { x: 0, y: -1 }; // Вверх
-        }
+        newDirection.y = deltaY > 0 ? 1 : -1;
     }
+    
+    // Проверка противоположного направления
+    if (direction.x !== -newDirection.x || direction.y !== -newDirection.y) {
+        nextDirection = newDirection;
+    }
+    
     event.preventDefault();
 }
 
