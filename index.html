@@ -252,6 +252,9 @@ let gameSpeed = 100;
 let lastUpdateTime = 0;
 let isGameRunning = false;
 let snakeCells = new Set();
+let obstacles = [];
+const OBSTACLE_COLOR = '#9E9E9E'; // Серый цвет для препятствий
+
 
 // При движении змейки
 snakeCells.clear();
@@ -462,6 +465,7 @@ function startGame() {
     direction = { x: 0, y: 1 };
     nextDirection = { x: 0, y: 1 };
     score = 0;
+    obstacles = generateObstacles(); // Генерируем препятствия
     scoreElement.textContent = score;
     placeFood();
     gameOverModal.style.display = 'none';
@@ -470,6 +474,54 @@ function startGame() {
     isGameRunning = true;
     requestAnimationFrame(gameLoop);
     showBannerAd();
+}
+
+function generateObstacles() {
+    const obstacles = [];
+    const gridSize = canvas.width / CELL_SIZE;
+    const offset = 5; // Отступ от углов
+
+    // Левый верхний угол (Г-образное препятствие)
+    for(let x = offset; x <= offset + 2; x++) {
+        obstacles.push({x, y: offset});
+        if(x === offset) {
+            for(let y = offset; y <= offset + 2; y++) {
+                obstacles.push({x, y});
+            }
+        }
+    }
+
+    // Правый верхний
+    for(let x = gridSize - offset - 3; x <= gridSize - offset - 1; x++) {
+        obstacles.push({x, y: offset});
+        if(x === gridSize - offset - 1) {
+            for(let y = offset; y <= offset + 2; y++) {
+                obstacles.push({x, y});
+            }
+        }
+    }
+
+    // Левый нижний
+    for(let x = offset; x <= offset + 2; x++) {
+        obstacles.push({x, y: gridSize - offset - 1});
+        if(x === offset) {
+            for(let y = gridSize - offset - 3; y <= gridSize - offset - 1; y++) {
+                obstacles.push({x, y});
+            }
+        }
+    }
+
+    // Правый нижний
+    for(let x = gridSize - offset - 3; x <= gridSize - offset - 1; x++) {
+        obstacles.push({x, y: gridSize - offset - 1});
+        if(x === gridSize - offset - 1) {
+            for(let y = gridSize - offset - 3; y <= gridSize - offset - 1; y++) {
+                obstacles.push({x, y});
+            }
+        }
+    }
+
+    return obstacles;
 }
 
 function gameLoop(timestamp) {
@@ -522,6 +574,28 @@ function updateSnake() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+// Отрисовка препятствий с эффектом 3D
+    ctx.fillStyle = '#78909C';
+    obstacles.forEach(obs => {
+        // Основной блок
+        ctx.fillRect(
+            obs.x * CELL_SIZE + 2,
+            obs.y * CELL_SIZE + 2,
+            CELL_SIZE - 4,
+            CELL_SIZE - 4
+        );
+        
+        // Тень
+        ctx.fillStyle = '#546E7A';
+        ctx.fillRect(
+            obs.x * CELL_SIZE + 2,
+            obs.y * CELL_SIZE + 2,
+            CELL_SIZE - 4,
+            3
+        );
+        ctx.fillStyle = '#78909C';
+    });
+
     // Отрисовка яблока
     if (food.x !== -1) {
         drawApple(
@@ -685,23 +759,35 @@ function placeFood() {
     const gridHeight = canvas.height / CELL_SIZE;
     const maxAttempts = 1000;
     
-    // Быстрый поиск случайной позиции
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
         const newX = Math.floor(Math.random() * gridWidth);
         const newY = Math.floor(Math.random() * gridHeight);
         
-        if (!snakeCells.has(`${newX},${newY}`)) {
+        const isOnSnake = snake.some(segment => 
+            segment.x === newX && segment.y === newY
+        );
+        const isOnObstacle = obstacles.some(obs => 
+            obs.x === newX && obs.y === newY
+        );
+        
+        if (!isOnSnake && !isOnObstacle) {
             food.x = newX;
             food.y = newY;
             return;
         }
     }
-    
-    // Полный перебор при неудаче
+
+    // Fallback
     const freeCells = [];
     for (let x = 0; x < gridWidth; x++) {
         for (let y = 0; y < gridHeight; y++) {
-            if (!snakeCells.has(`${x},${y}`)) {
+            const isOccupied = snake.some(segment => 
+                segment.x === x && segment.y === y
+            ) || obstacles.some(obs => 
+                obs.x === x && obs.y === y
+            );
+            
+            if (!isOccupied) {
                 freeCells.push({x, y});
             }
         }
@@ -712,7 +798,6 @@ function placeFood() {
         food.x = randomCell.x;
         food.y = randomCell.y;
     } else {
-        // Все клетки заняты
         food.x = -1;
         food.y = -1;
     }
@@ -721,19 +806,24 @@ function placeFood() {
 function checkCollision() {
     const head = snake[0];
     
-    // 1. Проверка выхода за границы поля
+    // 1. Проверка стен
     const wallCollision = 
         head.x < 0 || 
         head.x >= canvas.width / CELL_SIZE || 
         head.y < 0 || 
         head.y >= canvas.height / CELL_SIZE;
 
-    // 2. Проверка столкновения с телом
+    // 2. Проверка тела
     const bodyCollision = snake.slice(1).some(segment => 
         segment.x === head.x && segment.y === head.y
     );
+    
+    // 3. Проверка препятствий
+    const obstacleCollision = obstacles.some(obs => 
+        obs.x === head.x && obs.y === head.y
+    );
 
-    return wallCollision || bodyCollision;
+    return wallCollision || bodyCollision || obstacleCollision;
 }
 
 document.querySelectorAll('.difficultyBtn').forEach(button => {
