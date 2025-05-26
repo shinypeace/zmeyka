@@ -469,7 +469,7 @@ function startGame() {
     score = 0;
     obstacles = [];
     snakeCells.clear();
-        
+    
     // Установка скорости в зависимости от уровня
     switch(currentDifficulty) {
         case 'easy':
@@ -482,12 +482,6 @@ function startGame() {
             gameSpeed = 100;
             generateObstacles();
             break;
-    }
-
-    if (currentDifficulty === 'hard') {
-        snake = [{ x: 5, y: 5 }]; // Новая позиция для сложного уровня
-    } else {
-        snake = [{ x: 10, y: 10 }];
     }
     
     // Инициализация интерфейса
@@ -504,9 +498,9 @@ function startGame() {
 }
 
 function generateObstacles() {
-    obstacles.length = 0; // Очищаем предыдущие препятствия
+    obstacles.length = 0; // Очищаем массив
     const gridSize = canvas.width / CELL_SIZE;
-    const offset = 3; // Увеличили отступ от центра
+    const offset = 4;
 
     // Левый верхний угол (Г-образное препятствие)
     for(let x = offset; x <= offset + 2; x++) {
@@ -546,15 +540,6 @@ function generateObstacles() {
                 obstacles.push({x, y});
             }
         }
-    }
-
-    // 2. Центральный крест из 9 блоков
-    const center = Math.floor(gridSize / 2);
-    for(let i = -2; i <= 2; i++) {
-        // Горизонтальная линия
-        obstacles.push({x: center + i, y: center});
-        // Вертикальная линия
-        obstacles.push({x: center, y: center + i});
     }
 
     return obstacles;
