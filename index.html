@@ -183,8 +183,8 @@
 <body>
     <h1>Змейка</h1>
     <div id="mainMenu" class="menu">
-        <button class="difficultyBtn" data-speed="200" data-difficulty="easy">Просто</button>
-        <button class="difficultyBtn" data-speed="150" data-difficulty="medium">Средне</button>
+        <button class="difficultyBtn" data-speed="150" data-difficulty="easy">Просто</button>
+        <button class="difficultyBtn" data-speed="100" data-difficulty="medium">Средне</button>
         <button class="difficultyBtn" data-speed="100" data-difficulty="hard">Сложно</button>
         <button id="statsBtn" class="difficultyBtn">Статистика</button>
     </div>
@@ -253,7 +253,8 @@ let lastUpdateTime = 0;
 let isGameRunning = false;
 let snakeCells = new Set();
 let obstacles = [];
-const OBSTACLE_COLOR = '#9E9E9E'; // Серый цвет для препятствий
+let currentDifficulty = 'easy';
+const OBSTACLE_COLOR = '#607D8B';
 
 
 // При движении змейки
@@ -461,25 +462,51 @@ function updateStatsDisplay() {
 }
 
 function startGame() {
+    // Сброс основных параметров
     snake = [{ x: 10, y: 10 }];
     direction = { x: 0, y: 1 };
     nextDirection = { x: 0, y: 1 };
     score = 0;
-    obstacles = generateObstacles(); // Генерируем препятствия
+    obstacles = [];
+    snakeCells.clear();
+        
+    // Установка скорости в зависимости от уровня
+    switch(currentDifficulty) {
+        case 'easy':
+            gameSpeed = 150;
+            break;
+        case 'medium':
+            gameSpeed = 100;
+            break;
+        case 'hard':
+            gameSpeed = 100;
+            generateObstacles();
+            break;
+    }
+
+    if (currentDifficulty === 'hard') {
+        snake = [{ x: 5, y: 5 }]; // Новая позиция для сложного уровня
+    } else {
+        snake = [{ x: 10, y: 10 }];
+    }
+    
+    // Инициализация интерфейса
     scoreElement.textContent = score;
     placeFood();
     gameOverModal.style.display = 'none';
     mainMenu.style.display = 'none';
     gameContainer.style.display = 'block';
     isGameRunning = true;
+    
+    // Запуск игрового цикла
     requestAnimationFrame(gameLoop);
     showBannerAd();
 }
 
 function generateObstacles() {
-    const obstacles = [];
+    obstacles.length = 0; // Очищаем предыдущие препятствия
     const gridSize = canvas.width / CELL_SIZE;
-    const offset = 5; // Отступ от углов
+    const offset = 3; // Увеличили отступ от центра
 
     // Левый верхний угол (Г-образное препятствие)
     for(let x = offset; x <= offset + 2; x++) {
@@ -519,6 +546,15 @@ function generateObstacles() {
                 obstacles.push({x, y});
             }
         }
+    }
+
+    // 2. Центральный крест из 9 блоков
+    const center = Math.floor(gridSize / 2);
+    for(let i = -2; i <= 2; i++) {
+        // Горизонтальная линия
+        obstacles.push({x: center + i, y: center});
+        // Вертикальная линия
+        obstacles.push({x: center, y: center + i});
     }
 
     return obstacles;
@@ -577,23 +613,12 @@ function draw() {
 // Отрисовка препятствий с эффектом 3D
     ctx.fillStyle = '#78909C';
     obstacles.forEach(obs => {
-        // Основной блок
         ctx.fillRect(
-            obs.x * CELL_SIZE + 2,
-            obs.y * CELL_SIZE + 2,
-            CELL_SIZE - 4,
-            CELL_SIZE - 4
+            obs.x * CELL_SIZE,
+            obs.y * CELL_SIZE,
+            CELL_SIZE,
+            CELL_SIZE
         );
-        
-        // Тень
-        ctx.fillStyle = '#546E7A';
-        ctx.fillRect(
-            obs.x * CELL_SIZE + 2,
-            obs.y * CELL_SIZE + 2,
-            CELL_SIZE - 4,
-            3
-        );
-        ctx.fillStyle = '#78909C';
     });
 
     // Отрисовка яблока
