@@ -255,6 +255,7 @@ let snakeCells = new Set();
 let obstacles = [];
 let currentDifficulty = 'easy';
 const OBSTACLE_COLOR = '#607D8B';
+let startTime = 0;
 
 
 // При движении змейки
@@ -462,6 +463,7 @@ function updateStatsDisplay() {
 }
 
 function startGame() {
+    startTime = Date.now(); // Записываем время начала игры
     // Сброс основных параметров
     snake = [{ x: 10, y: 10 }];
     direction = { x: 0, y: 1 };
@@ -856,8 +858,7 @@ document.querySelector('.closeStatsBtn').addEventListener('click', () => {
 });
 
 async function endGame() {
-    if (!isGameRunning) return; // Защита от повторного вызова
-    
+    if (!isGameRunning) return;
     isGameRunning = false;
     cancelAnimationFrame(gameLoop);
     
@@ -867,8 +868,12 @@ async function endGame() {
     gameOverModal.style.display = 'flex';
     gameContainer.style.display = 'none';
     
-    // Показ рекламы
-    await showAdInterstitial().catch(console.error);
+    // Проверка времени игры
+    const playTime = (Date.now() - startTime) / 1000; // Время в секундах
+    if (playTime > 15) {
+        // Показ рекламы только если играли больше 15 секунд
+        await showAdInterstitial().catch(console.error);
+    }
     
     // Сохранение статистики
     if (score > highScores[currentDifficulty]) {
