@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="vk:storage" content="enable">
     <title>Игра Змейка</title>
     <style>
         body {
@@ -266,30 +265,16 @@ snake.forEach(segment => {
 });
 
 
+// ====== Обновленная инициализация ======
 vkBridge.send('VKWebAppInit', {})
     .then(async () => {
-        const params = new URLSearchParams(window.location.hash.substr(1));
-        vkUserId = params.get('vk_user_id');
-        vkAccessToken = params.get('vk_access_token');
+        await loadStats();
         
-        try {
-            if (vkUserId) {
-                await validateSignature(params);
-                vkUser = await vkBridge.send('VKWebAppGetUserInfo');
-                
-                // Загружаем данные сразу при инициализации
-                await loadStats();
-                
-                // Синхронизация каждые 5 минут
-                setInterval(async () => {
-                    await loadStats();
-                    updateStatsDisplay();
-                }, 300000);
-            }
-        } catch (err) {
-            console.error('VK auth error:', err);
-            loadLocalStats();
-        }
+        // Фоновая синхронизация каждые 5 минут
+        setInterval(async () => {
+            await loadStats();
+            await saveStats();
+        }, 300000);
     })
     .catch(err => {
         console.error('VK init error:', err);
@@ -408,62 +393,54 @@ function showAdReward() {
 async function saveStats() {
     const data = {
         highScores,
-        lastUpdated: Date.now()
+        lastUpdated: Date.now(),
+        syncVersion: 2 // Версия формата данных
     };
 
     try {
-        // Всегда сначала сохраняем в облако
-        if (vkUserId) {
-            await vkBridge.send('VKWebAppStorageSet', {
-                key: `snakeStats`,
-                value: JSON.stringify(data),
-                global: true // Ключевое изменение - хранилище доступно на всех платформах
-            });
-        }
+        // Сохраняем в облако
+        const cloudResponse = await vkBridge.send('VKWebAppStorageSet', {
+            key: `snakeStats`,
+            value: JSON.stringify(data),
+            global: true
+        });
+        cloudSaveTimestamp = Date.now();
+
+        // Дублируем в локальное хранилище
+        localStorage.setItem('snakeCloudSave', JSON.stringify(data));
+        localSaveTimestamp = data.lastUpdated;
         
-        // Локальное сохранение как fallback
-        localStorage.setItem('snakeHighScores', JSON.stringify(data));
-        
-        console.log('Progress saved to cloud and local');
     } catch (err) {
-        console.error('Save error:', err);
-        localStorage.setItem('snakeHighScores', JSON.stringify(data));
+        // Fallback на локальное сохранение
+        localStorage.setItem('snakeLocalSave', JSON.stringify(data));
+        localSaveTimestamp = data.lastUpdated;
+        console.error('Cloud save failed:', err);
     }
 }
 
 async function loadStats() {
     try {
-        let cloudData = null;
-        let localData = JSON.parse(localStorage.getItem('snakeHighScores'));
-        
-        // Приоритет у облачного хранилища
-        if (vkUserId) {
-            const response = await vkBridge.send('VKWebAppStorageGet', {
-                keys: ['snakeStats'],
-                global: true // Важно для кросс-платформенности
-            });
-            
-            if (response.keys[0]?.value) {
-                cloudData = JSON.parse(response.keys[0].value);
-            }
-        }
+        // Параллельная загрузка из всех источников
+        const [cloudData, localData] = await Promise.all([
+            loadFromCloud(),
+            loadFromLocal()
+        ]);
 
-        // Синхронизация данных
-        if (cloudData && localData) {
-            // Выбираем самые свежие данные
-            const mostRecent = cloudData.lastUpdated > localData.lastUpdated 
-                ? cloudData 
-                : localData;
+        // Определение самой свежей версии
+        const latestData = getLatestVersion(
+            cloudData,
+            localData,
+            JSON.parse(localStorage.getItem('snakeHighScores'))
+        );
+
+        // Обновление игры
+        if(latestData) {
+            highScores = latestData.highScores;
             
-            highScores = mostRecent.highScores;
-            if (mostRecent === localData) {
-                // Обновляем облако локальными данными
-                await saveStats();
+            // Принудительная синхронизация если нужно
+            if(latestData.source === 'local' && cloudData) {
+                await this.saveStats();
             }
-        } else if (cloudData) {
-            highScores = cloudData.highScores;
-        } else if (localData) {
-            highScores = localData.highScores;
         }
         
         updateStatsDisplay();
@@ -474,12 +451,45 @@ async function loadStats() {
 }
 
 
-function loadLocalStats() {
-    const localData = localStorage.getItem('snakeHighScores');
-    if (localData) {
-        highScores = JSON.parse(localData);
-        updateStatsDisplay();
+
+async function loadFromCloud() {
+    try {
+        const response = await vkBridge.send('VKWebAppStorageGet', {
+            keys: ['snakeStats'],
+            global: true
+        });
+        
+        if(response.keys[0]?.value) {
+            const data = JSON.parse(response.keys[0].value);
+            data.source = 'cloud';
+            return data;
+        }
+    } catch (err) {
+        const localCloud = localStorage.getItem('snakeCloudSave');
+        return localCloud ? JSON.parse(localCloud) : null;
     }
+}
+
+function loadFromLocal() {
+    const localData = localStorage.getItem('snakeLocalSave') 
+        || localStorage.getItem('snakeHighScores');
+    
+    if(localData) {
+        const data = JSON.parse(localData);
+        data.source = 'local';
+        return data;
+    }
+    return null;
+}
+
+function getLatestVersion(...sources) {
+    const validSources = sources.filter(s => s?.highScores);
+    
+    if(validSources.length === 0) return null;
+    
+    return validSources.sort((a, b) => 
+        b.lastUpdated - a.lastUpdated
+    )[0];
 }
 
 function updateStatsDisplay() {
@@ -903,14 +913,10 @@ async function endGame() {
     }
     
     // Сохранение и синхронизация
-    if (score > highScores[currentDifficulty]) {
+    if(score > highScores[currentDifficulty]) {
         highScores[currentDifficulty] = score;
         await saveStats();
-        
-        // Принудительно обновляем данные из облака
-        if (vkUserId) {
-            await loadStats();
-        }
+        await loadStats(); // Получаем актуальные данные
     }
 }
 
